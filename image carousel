@@ -9,7 +9,7 @@ Open pubspec.yaml and add:
 dependencies:
  flutter:
  sdk: flutter
- carousel_slider: ^4.2.1
+ carousel_slider: ^5.1.1
 Then run:
 flutter pub get
 
