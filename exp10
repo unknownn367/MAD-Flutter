@@ -1,0 +1,147 @@
+exp 10
+
+INSERT INTO users (name, email, mobile) VALUES
+('Shrikant', 'shrikant@gmail.com', '9876543210'),
+('Rahul', 'rahul@gmail.com', '9123456780'),
+('Priya', 'priya@gmail.com', '9988776655');
+
+
+
+fetch.php->
+
+<?php
+// 1. Allow Chrome browser to fetch this data without CORS blockades
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+
+// 2. Connect to database using your custom port 3307
+$conn = new mysqli("localhost", "root", "", "flutter_db", 3307);
+
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+// 3. Fetch all user rows from the table
+$sql = "SELECT * FROM users";
+$result = $conn->query($sql);
+
+$data = array();
+
+// Loop through rows and pack them into a clean associative array
+while($row = $result->fetch_assoc()){
+    $data[] = $row;
+}
+
+// 4. Convert array to JSON string format for Flutter to read
+echo json_encode($data);
+
+$conn->close();
+?>
+
+
+
+
+
+main.dart
+
+
+
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      home: FetchPage(),
+      debugShowCheckedModeBanner: false,
+    );
+  }
+}
+
+class FetchPage extends StatefulWidget {
+  const FetchPage({super.key});
+
+  @override
+  _FetchPageState createState() => _FetchPageState();
+}
+
+class _FetchPageState extends State<FetchPage> {
+  // Dynamic list to hold our incoming JSON maps
+  List users = [];
+  bool isLoading = true;
+  String errorMessage = '';
+
+  // Asynchronous network query
+  Future<void> fetchData() async {
+    // Kept at localhost:8080 to match your customized Apache server port in Chrome
+    var url = Uri.parse("http://localhost:8080/flutter_api/fetch.php");
+    
+    try {
+      var response = await http.get(url);
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+        setState(() {
+          users = json.decode(response.body);
+          isLoading = false;
+        });
+      } else {
+        throw Exception("Server returned status code: ${response.statusCode}");
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        errorMessage = e.toString();
+        isLoading = false;
+      });
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    fetchData(); // Triggers data download the moment this screen mounts
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Fetch Data (Experiment 10)")),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator()) // Spinner shows while loading data
+          : errorMessage.isNotEmpty
+              ? Center(child: Text("Error: $errorMessage", style: const TextStyle(color: Colors.red)))
+              : users.isEmpty
+                  ? const Center(child: Text("No records found in database."))
+                  : ListView.builder(
+                      itemCount: users.length,
+                      itemBuilder: (context, index) {
+                        return Card(
+                          margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                          elevation: 3,
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              child: Text(users[index]['name'][0].toString().toUpperCase()),
+                            ),
+                            title: Text(users[index]['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text(users[index]['email']),
+                            trailing: Text(
+                              users[index]['mobile'],
+                              style: const TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                        );
+          },
+       ),
+    );
+  }
+}
+
